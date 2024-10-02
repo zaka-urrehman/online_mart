@@ -8,6 +8,10 @@ x-kong-config:
   KONG_PG_USER: ${KONG_PG_USER:-kong}
   KONG_PG_PASSWORD_FILE: /run/secrets/kong_postgres_password
 
+networks:
+  default:
+    driver: bridge
+
 volumes:
   postgres_db:
     driver: local
@@ -24,15 +28,18 @@ volumes:
 services:
   # ------------------------------------------------------------------ #
   user:
+    container_name: user_service
     build: 
       context: ./user-service 
       dockerfile: Dockerfile
+    volumes:
+      - ./user-service:/code #sync the local code with code inside container 
     ports:
-      - 8001:8000 
+      - 8010:8000 
     depends_on:
-      - kafka 
       - database
-      - kong
+    # profiles:
+    #   - temporary
   # ------------------------------------------------------------------ #
   database:
     image: postgres:latest  # Use the existing PostgreSQL image for the application database
@@ -43,9 +50,11 @@ services:
       - POSTGRES_PASSWORD=zaka123
       - POSTGRES_DB=online-mart-database
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - postgres_db:/var/lib/postgresql/data
+    # profiles:
+    #   - temporary
   # ------------------------------------------------------------------ #
   kafka:
     image: apache/kafka:3.7.0  # Use the official Apache Kafka image with KRaft mode
@@ -80,7 +89,7 @@ services:
       DYNAMIC_CONFIG_ENABLED: "true"
     depends_on:
       - kafka
-  # ------------------------------------------------------------------ #
+#   # ------------------------------------------------------------------ #
   db:  # Dedicated PostgreSQL service for Kong
     image: postgres:9.5
     environment:
@@ -143,7 +152,7 @@ services:
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_PREFIX: ${KONG_PREFIX:-/var/run/kong}
-      KONG_DECLARATIVE_CONFIG: "/opt/kong/kong.yaml"
+      # KONG_DECLARATIVE_CONFIG: "/opt/kong/kong.yaml"
     secrets:
       - kong_postgres_password
     ports:
@@ -164,7 +173,21 @@ services:
       - kong_tmp_vol:/tmp
       - ./config:/opt/kong
     security_opt:
-      - no-new-privileges
+      - no-new-privileges  
+
+  # ------------------------------------------------------------------ #
+
+   # Service to execute shell script
+  kong-setup:
+    image: curlimages/curl  # Lightweight image with curl installed
+    container_name: kongSetupContainer
+    depends_on:
+      - kong  # Wait until Kong is fully up
+    entrypoint: ["/bin/sh", "-c", "/bin/sh /opt/kong_setup.sh"]  # Removed the need for chmod
+    volumes:
+      - ./kong_setup.sh:/opt/kong_setup.sh  # Mount the script
+
+
 
 secrets:
   kong_postgres_password:
