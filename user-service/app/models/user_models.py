@@ -1,12 +1,27 @@
+import re
+
 from sqlmodel import SQLModel, Field, Relationship
 from typing import List
 from datetime import datetime, timezone
-from pydantic import EmailStr
+from pydantic import field_validator
+
+
+# Define a regex pattern for validating emails
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+
+
 
 # Base class for common properties: email, phone
 class UserBase(SQLModel):
-    email: EmailStr
+    email: str
     phone: str
+
+     # Custom validator to ensure the email matches the regex pattern
+    @field_validator('email')
+    def validate_email(cls, value):
+        if not EMAIL_REGEX.match(value):
+            raise ValueError('Invalid email address')
+        return value
 
 # 1. UserAuth Class
 class UserAuth(UserBase):
@@ -30,11 +45,12 @@ class AddUserAddress(UserBase):
 class User(UserRegister, table=True):
     user_id: int | None = Field(default=None, primary_key=True)
     image: str | None = None
-    role: str | None = None
+    role: str | None = "user"
     status: str | None = "active"  # default status is 'active'
     created_at: datetime | None = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime | None = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    # TODO: include otp later
 
     # Relationship with UserAddress
     addresses: List["UserAddress"] = Relationship(back_populates="user")
