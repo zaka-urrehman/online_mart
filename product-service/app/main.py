@@ -1,5 +1,6 @@
 from fastapi import FastAPI 
 from contextlib import asynccontextmanager
+
 from app.routes import category_routes, size_routes, product_routes
 from app.db.db_connection import create_db_and_tables
 

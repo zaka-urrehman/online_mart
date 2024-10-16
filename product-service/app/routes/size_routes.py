@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from typing import Annotated,Any
 from fastapi.encoders import jsonable_encoder
 
+from app.utils.auth import get_current_user
 from app.models.models import Size, AddSize, SizeResponse
 from app.controllers.size_crud import (
     get_all_sizes,
@@ -34,7 +35,7 @@ async def get_size(size: Annotated[Size, Depends(get_size_by_id)]):
 
 # --------------------------------------------------------------------------
 @router.post("/add-size", response_model=Size)
-async def add_size(size: Annotated[AddSize, Depends(add_size_in_db)]):
+async def add_size(current_user: Annotated[Any, (Depends(get_current_user))], size: Annotated[AddSize, Depends(add_size_in_db)]):
     """
     Add a new size to the database.
     """
@@ -42,7 +43,7 @@ async def add_size(size: Annotated[AddSize, Depends(add_size_in_db)]):
 
 # --------------------------------------------------------------------------
 @router.put("/update-size/{size_id}", response_model=Size)
-async def update_size(size: Annotated[Size, Depends(update_size_in_db)]):
+async def update_size(current_user: Annotated[Any, (Depends(get_current_user))], size: Annotated[Size, Depends(update_size_in_db)]):
     """
     Update a size by its ID.
     """
@@ -50,7 +51,7 @@ async def update_size(size: Annotated[Size, Depends(update_size_in_db)]):
 
 # --------------------------------------------------------------------------
 @router.delete("/delete-size/{size_id}")
-async def delete_size(result: Annotated[dict, Depends(delete_size_from_db)]):
+async def delete_size(current_user: Annotated[Any, (Depends(get_current_user))], result: Annotated[dict, Depends(delete_size_from_db)]):
     """
     Delete a size by its ID.
     """

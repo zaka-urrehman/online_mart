@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
-from typing import  Annotated
+from typing import  Annotated, Any
 
+from app.utils.auth import get_current_user
 from app.models.models import AddProduct, Product, ProductSize
 from app.controllers.product_crud import (
     get_all_products, get_product_by_id, add_product_in_db,
@@ -31,7 +32,7 @@ async def get_product(product: Annotated[Product, Depends(get_product_by_id)]):
 # ========================================= CREATE NEW PRODUCT ===================================================
 
 @router.post("/add-product")
-async def add_product(product: Annotated[Product, Depends(add_product_in_db)]):
+async def add_product(current_user: Annotated[Any, (Depends(get_current_user))], product: Annotated[Product, Depends(add_product_in_db)]):
     """
     Add a new product to the database.
     """
@@ -43,7 +44,7 @@ async def add_product(product: Annotated[Product, Depends(add_product_in_db)]):
 # ========================================= UPDATE PRODUCT =======================================================
 
 @router.put("/update-product/{product_id}")
-async def update_product(product_id: int, product: Annotated[Product, Depends(update_product_in_db)]):
+async def update_product(current_user: Annotated[Any, (Depends(get_current_user))], product_id: int, product: Annotated[Product, Depends(update_product_in_db)]):
     """
     Update an existing product.
     """
@@ -51,7 +52,7 @@ async def update_product(product_id: int, product: Annotated[Product, Depends(up
 # ========================================= DELETE PRODUCT =======================================================
 
 @router.delete("/delete-product/{product_id}")
-async def delete_product(message: Annotated[dict, Depends(delete_product_from_db)]):
+async def delete_product( current_user: Annotated[Any, (Depends(get_current_user))], message: Annotated[dict, Depends(delete_product_from_db)]):
     """
     Delete a product by its ID.
     """
@@ -60,7 +61,7 @@ async def delete_product(message: Annotated[dict, Depends(delete_product_from_db
 # ========================================= ASSIGN SIZES TO PRODUCT ==============================================
 
 @router.post("/assign-sizes/{product_id}")
-async def assign_sizes(product_id: int, size_ids: list[int], message: Annotated[dict, Depends(assign_sizes_to_product)]):
+async def assign_sizes(current_user: Annotated[Any, (Depends(get_current_user))], product_id: int, size_ids: list[int], message: Annotated[dict, Depends(assign_sizes_to_product)]):
     """
     Assign sizes to a product.
     """
