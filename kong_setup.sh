@@ -38,7 +38,7 @@ else
     echo "Creating user-service..."
     curl -i -X POST $KONG_ADMIN_URL/services \
       --data name=user-service \
-      --data url='http://host.docker.internal:8000'  # Assuming user-service runs at port 8000
+      --data url='http://host.docker.internal:8010'  # Assuming user-service runs at port 8000
 
     # Check if service was created successfully
     if [ $? -eq 0 ]; then
@@ -113,6 +113,52 @@ else
         echo "Route for product-service added successfully!"
     else
         echo "Failed to add route for product-service"
+        exit 1
+    fi
+fi
+
+# ----------------------------------------
+# Check if inventory-service exists
+# ----------------------------------------
+echo "Checking if inventory-service exists..."
+inventory_service_check=$(curl -s $KONG_ADMIN_URL/services/inventory-service)
+
+if echo "$inventory_service_check" | grep -q '"name":"inventory-service"'; then
+    echo "inventory-service already exists. Skipping service creation."
+else
+    # Create inventory-service in Kong
+    echo "Creating inventory-service..."
+    curl -i -X POST $KONG_ADMIN_URL/services \
+      --data name=inventory-service \
+      --data url='http://host.docker.internal:8012'  # Assuming inventory-service runs at port 8012
+
+    # Check if service was created successfully
+    if [ $? -eq 0 ]; then
+        echo "inventory-service created successfully!"
+    else
+        echo "Failed to create inventory-service"
+        exit 1
+    fi
+fi
+
+# Check if a route for inventory-service already exists
+echo "Checking if route for inventory-service exists..."
+inventory_route_check=$(curl -s $KONG_ADMIN_URL/routes | jq '.data[] | select(.paths[] == "/inventory-service")')
+
+if [ -n "$inventory_route_check" ]; then
+    echo "Route for /inventory-service already exists. Skipping route creation."
+else
+    # Add a route for inventory-service
+    echo "Adding a route for inventory-service..."
+    curl -i -X POST $KONG_ADMIN_URL/routes \
+      --data 'paths[]=/inventory-service' \
+      --data service.name=inventory-service
+
+    # Check if route was added successfully
+    if [ $? -eq 0 ]; then
+        echo "Route for inventory-service added successfully!"
+    else
+        echo "Failed to add route for inventory-service"
         exit 1
     fi
 fi
