@@ -59,6 +59,22 @@ services:
     # profiles:
     #   - temporary
   # ------------------------------------------------------------------ #
+  inventory:
+    container_name: inventory_service
+    build: 
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./inventory-service:/code #sync the local code with code inside container 
+    ports:
+      - 8012:8000 
+    depends_on:
+      - database
+      - kafka-broker
+      - kafka-ui
+    # profiles:
+    #   - temporary
+  # ------------------------------------------------------------------ #
   database:
     image: postgres:latest  # Use the existing PostgreSQL image for the application database
     restart: always
@@ -215,7 +231,7 @@ services:
     container_name: kongSetupContainer
     depends_on:
       - kong  # Wait until Kong is fully up
-    entrypoint: ["/bin/sh", "-c", "apk add --no-cache jq && /bin/sh /opt/kong_setup.sh"]  # Install jq before running the script
+    entrypoint: ["/bin/sh", "/opt/kong_setup.sh"]
     volumes:
       - ./kong_setup.sh:/opt/kong_setup.sh  # Mount the script
 
