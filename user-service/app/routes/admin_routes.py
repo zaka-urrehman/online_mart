@@ -6,7 +6,7 @@ from app.controllers.auth_user import login_user, get_current_user
 
 router = APIRouter()
 
-@router.get("/get_admins")
+@router.get("/get-admins")
 def get_admins(current_user: Annotated[User, (Depends(get_current_user))], admins: Annotated[list, (Depends(get_all_admins))]):
     """
     Get all admins from the database. This endpoint uses the `get_all_admins` dependency
@@ -20,7 +20,7 @@ def get_admins(current_user: Annotated[User, (Depends(get_current_user))], admin
         "admins" : admins
     }
 
-@router.post("/add_admin")
+@router.post("/add-admin")
 def add_admin(new_admin: Annotated[UserRegister, (Depends(add_admin_in_db))]):
     """
     Add a new admin to the database. This endpoint uses the `add_admin_in_db` dependency
@@ -38,7 +38,7 @@ def add_admin(new_admin: Annotated[UserRegister, (Depends(add_admin_in_db))]):
         }
     }
 
-@router.put("/update_admin")
+@router.put("/update-admin")
 def update_admin(current_user: Annotated[User, (Depends(get_current_user))], updated_admin: Annotated[User, (Depends(update_admin_in_db))]):
     """
     Update an admin in the database by their ID. This endpoint
@@ -53,7 +53,7 @@ def update_admin(current_user: Annotated[User, (Depends(get_current_user))], upd
         "admin" : updated_admin
     }
 
-@router.delete("/delete_admin")
+@router.delete("/delete-admin")
 def delete_admin(current_user: Annotated[User, (Depends(get_current_user))], message: Annotated[dict, (Depends(delete_admin_from_db))]):
     """
     Delete an admin from the database by their ID. This endpoint uses the
@@ -67,7 +67,7 @@ def delete_admin(current_user: Annotated[User, (Depends(get_current_user))], mes
 
 
 # currently same auth process is used for admin and user, but the admin auth process will be seprate from user in future
-@router.post("/login_admin")
+@router.post("/login-admin")
 def login_user(token: Annotated[str, (Depends(login_user))]):
     """
     Login an admin. This endpoint uses the `login_user` dependency to generate

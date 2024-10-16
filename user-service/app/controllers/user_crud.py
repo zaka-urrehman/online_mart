@@ -1,7 +1,10 @@
 from sqlmodel import Session, select
 from typing import Annotated
 from fastapi import Depends, HTTPException
+from aiokafka import AIOKafkaProducer
 
+from app.protobuf import user_pb2
+from app.kafka.producer import KAFKA_PRODUCER
 from app.models.user_models import UserRegister, User
 from app.db.db_connection import DB_SESSION
 from app.utils.auth import hash_password
@@ -26,8 +29,41 @@ async def add_user_in_db(user_details: UserRegister, session: DB_SESSION):
     session.add(new_user)
     session.commit()
     session.refresh(new_user)  # Refresh to get the newly created ID
-
+    
+    print("new user added in db: ",new_user)
     return new_user
+
+#-----------------------------------------------------------------------------------------------------------------------
+async def send_to_kafka(producer: AIOKafkaProducer, topic: str, user_data: dict):
+    """
+    Send serialized Protobuf data to Kafka topic.
+    Args:
+        producer (AIOKafkaProducer): Kafka producer instance.
+        topic (str): Kafka topic to send data to.
+        user_data (dict): User data to serialize and send.
+    """
+    try:
+        # Create a Protobuf UserRegister object
+        user = user_pb2.UserRegister()
+        user.first_name = user_data["first_name"]
+        user.last_name = user_data["last_name"]
+        user.email = user_data["email"]
+        user.phone = user_data["phone"]
+        user.status = user_data["status"]
+        user.password = user_data["password"]
+
+        # Serialize Protobuf object to binary format
+        serialized_data = user.SerializeToString()
+        print("serialized_data: ",serialized_data)
+        # Send serialized data to Kafka
+        await producer.send_and_wait(topic, serialized_data)
+        print(f"Sent message to Kafka topic {topic}: {user_data}")
+    
+    except Exception as e:
+        # Handle any exceptions during serialization or Kafka communication
+        print(f"Failed to send message to Kafka: {e}")
+        raise Exception(f"Error while sending data to Kafka: {e}")
+
 
 #-----------------------------------------------------------------------------------------------------------------------
 

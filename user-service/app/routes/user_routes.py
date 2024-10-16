@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Annotated
 
+from app.kafka.producer import KAFKA_PRODUCER 
 from app.models.user_models import UserRegister, User
-from app.controllers.user_crud import add_user_in_db, get_all_users, delete_user_from_db, update_user_in_db
+from app.controllers.user_crud import add_user_in_db, get_all_users, delete_user_from_db, update_user_in_db, send_to_kafka
 from app.controllers.auth_user import login_user, get_current_user 
 
 router = APIRouter()
 
 
-@router.get("/get_users")
+@router.get("/get-users")
 def get_users(current_user: Annotated[User, (Depends(get_current_user))], users: Annotated[list, (Depends(get_all_users))]):
     """
     Get all users from the database. This endpoint uses the `get_all_users` dependency
@@ -22,25 +23,39 @@ def get_users(current_user: Annotated[User, (Depends(get_current_user))], users:
         "users" : users
     } 
 
-@router.post("/add_user")
-def add_user(new_user : Annotated[UserRegister, (Depends(add_user_in_db))]):
+@router.post("/add-user")
+async def add_user(new_user: UserRegister, producer: KAFKA_PRODUCER):
     """
-    Add a new user to the database. This endpoint uses the `add_user_in_db` dependency
-    to add the user to the database and return the new user.    
+    API endpoint to add a user. The user data is sent to Kafka in Protobuf format.
+    """
+    user_data = {
+        "first_name": new_user.first_name,
+        "last_name": new_user.last_name,
+        "email": new_user.email,
+        "phone": new_user.phone,
+        "status": "pending",  # Setting status to pending until processed by the consumer
+        "password": new_user.password
+    }
 
-    Returns:
-        new_user: The new user object.
-    """
+    # Try to send user data to Kafka
+    try:
+        await send_to_kafka(producer, "user-events", user_data)
+    except Exception as e:
+        print(f"Error while sending data to Kafka: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send data to Kafka")
+
+    # If successful, return a confirmation message
     return {
-            "message" : "user added successfully",
-            "user" : {
-                    "username" : new_user.first_name + " " + new_user.last_name,
-                    "email" : new_user.email,
-                    "phone" : new_user.phone
-                }
-            }
+        "message": "User data sent to Kafka successfully",
+        "user": {
+            "first_name": new_user.first_name,
+            "last_name": new_user.last_name,
+            "email": new_user.email,
+            "phone": new_user.phone
+        }
+    }
 
-@router.put("/update_user")
+@router.put("/update-user")
 def update_user(current_user: Annotated[User, (Depends(get_current_user))], updated_user: Annotated[User, (Depends(update_user_in_db))]):
     """
     Update a user in the database by their ID. This endpoint
@@ -55,7 +70,7 @@ def update_user(current_user: Annotated[User, (Depends(get_current_user))], upda
             "user" : updated_user
         }
 
-@router.delete("/delete_user")
+@router.delete("/delete-user")
 def delete_user(current_user: Annotated[User, (Depends(get_current_user))], message: Annotated[dict, (Depends(delete_user_from_db))]):
     """
     Delete a user from the database by their ID. This endpoint uses the
@@ -69,7 +84,7 @@ def delete_user(current_user: Annotated[User, (Depends(get_current_user))], mess
     return message
 
 
-@router.post("/login_user")
+@router.post("/login-user")
 def login_user(token: Annotated[str, (Depends(login_user))]):
     """
     Login a user. This endpoint uses the `login_user` dependency to generate
