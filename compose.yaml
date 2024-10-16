@@ -38,6 +38,24 @@ services:
       - 8010:8000 
     depends_on:
       - database
+      - kafka-broker
+      - kafka-ui
+    # profiles:
+    #   - temporary
+  # ------------------------------------------------------------------ #
+  product:
+    container_name: product_service
+    build: 
+      context: ./product-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./product-service:/code #sync the local code with code inside container 
+    ports:
+      - 8011:8000 
+    depends_on:
+      - database
+      - kafka-broker
+      - kafka-ui
     # profiles:
     #   - temporary
   # ------------------------------------------------------------------ #
@@ -56,10 +74,10 @@ services:
     # profiles:
     #   - temporary
   # ------------------------------------------------------------------ #
-  kafka:
+  kafka-broker:
     image: apache/kafka:3.7.0  # Use the official Apache Kafka image with KRaft mode
     hostname: broker
-    container_name: KafkaContainer
+    container_name: kafka-broker
     ports:
       - '9092:9092'
     environment:
@@ -77,19 +95,33 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+    restart: always
   # ------------------------------------------------------------------ #
   kafka-ui:
     image: provectuslabs/kafka-ui
     container_name: kafka-ui
     ports:
-      - "8080:8080"
+      - "9080:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: 'Local Kafka Cluster'
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 'broker:19092'
       DYNAMIC_CONFIG_ENABLED: "true"
     depends_on:
-      - kafka
-#   # ------------------------------------------------------------------ #
+      - kafka-broker
+
+  # ------------------------------------------------------------------ #
+  schema-registry:
+    image: confluentinc/cp-schema-registry:latest
+    ports:
+      - "9081:8081"
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "PLAINTEXT://broker:19092"
+      SCHEMA_REGISTRY_HOST_NAME: "schema-registry"
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
+    depends_on:
+      - kafka-broker
+
+  # ------------------------------------------------------------------ #
   db:  # Dedicated PostgreSQL service for Kong
     image: postgres:9.5
     environment:
@@ -177,15 +209,16 @@ services:
 
   # ------------------------------------------------------------------ #
 
-   # Service to execute shell script
+  # Service to execute shell script
   kong-setup:
     image: curlimages/curl  # Lightweight image with curl installed
     container_name: kongSetupContainer
     depends_on:
       - kong  # Wait until Kong is fully up
-    entrypoint: ["/bin/sh", "-c", "/bin/sh /opt/kong_setup.sh"]  # Removed the need for chmod
+    entrypoint: ["/bin/sh", "-c", "apk add --no-cache jq && /bin/sh /opt/kong_setup.sh"]  # Install jq before running the script
     volumes:
       - ./kong_setup.sh:/opt/kong_setup.sh  # Mount the script
+
 
 
 
