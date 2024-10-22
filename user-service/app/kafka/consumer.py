@@ -6,6 +6,7 @@ from app.db.db_connection import engine
 from app.protobuf import user_pb2
 from app.models.user_models import UserRegister
 from app.controllers.user_crud import add_user_in_db
+from app.settings import KAFKA_USER_TOPIC
 
 async def consume_user_events(topic: str, bootstrap_servers: str):
     """

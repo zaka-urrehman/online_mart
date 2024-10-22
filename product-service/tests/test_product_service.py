@@ -1,14 +1,14 @@
 from fastapi.testclient import TestClient
 from app.main import app
-from app.settings import TESTING_PRODUCT_ID, TESTING_SIZE_ID, TESTING_CATEGORY_ID
+# from app.settings import TESTING_PRODUCT_ID, TESTING_SIZE_ID, TESTING_CATEGORY_ID
 
 client = TestClient(app)
 
-testing_product_id = TESTING_PRODUCT_ID
-testing_category_id = TESTING_CATEGORY_ID
-testing_size_id = TESTING_SIZE_ID
+# testing_product_id = TESTING_PRODUCT_ID
+# testing_category_id = TESTING_CATEGORY_ID
+# testing_size_id = TESTING_SIZE_ID
 
-print("ids here: " , testing_category_id, testing_product_id, testing_size_id)
+# print("ids here: " , testing_category_id, testing_product_id, testing_size_id)
 
 # ========================================= ADD NEW CATEGORY =========================================
 def test_add_category():
@@ -50,7 +50,7 @@ def test_get_categories():
 # # ========================================= ADD NEW SIZE =========================================
 def test_add_size():
     new_size = {
-        "size_id": testing_size_id,
+        # "size_id": testing_size_id,
         "size_name": "Testing Size"
     }
     response = client.post("/size/add-size", json=new_size)
@@ -82,7 +82,7 @@ def test_get_sizes():
 # # ========================================= ADD NEW PRODUCT =========================================
 def test_add_product():
     new_product = {
-    "product_id": testing_product_id,
+    # "product_id": testing_product_id,
     "product_name": "Testing Product",
     "description": "not available",
     "brand": "string",

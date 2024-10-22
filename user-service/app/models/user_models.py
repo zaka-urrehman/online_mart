@@ -33,7 +33,7 @@ class UserRegister(UserAuth):
     last_name: str
 
 # 3. AddUserAddress Class
-class AddUserAddress(UserBase):
+class AddUserAddress(SQLModel):
     user_id: int
     lat: float | None = None
     lng: float | None = None

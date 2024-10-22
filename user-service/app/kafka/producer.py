@@ -14,4 +14,7 @@ async def get_kafka_producer():
         print("Producer is stopped....!")
         await producer.stop()
 
+
+# =================================================================================================
+
 KAFKA_PRODUCER = Annotated[AIOKafkaProducer, Depends(get_kafka_producer)]

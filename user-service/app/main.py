@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from app.routes import user_routes, admin_routes
 from app.db.db_connection import create_db_and_tables
 from app.kafka.consumer import consume_user_events
+from app.settings import KAFKA_USER_TOPIC
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -13,7 +15,7 @@ async def lifespan(app: FastAPI):
     create_db_and_tables()
 
     # Create a Kafka consumer task for the 'user-events' topic
-    task = asyncio.create_task(consume_user_events('user-events', 'broker:19092'))
+    task = asyncio.create_task(consume_user_events(KAFKA_USER_TOPIC, 'broker:19092'))
 
     # Yield to let the application start
     yield

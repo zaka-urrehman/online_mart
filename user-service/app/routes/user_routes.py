@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Annotated
+from typing import Annotated, Any
 
 from app.kafka.producer import KAFKA_PRODUCER 
 from app.models.user_models import UserRegister, User
-from app.controllers.user_crud import add_user_in_db, get_all_users, delete_user_from_db, update_user_in_db, send_to_kafka
+from app.controllers.user_crud import add_user_in_db, get_all_users, delete_user_from_db, update_user_in_db, send_user_to_kafka, add_user_address
 from app.controllers.auth_user import login_user, get_current_user 
+from app.settings import KAFKA_USER_TOPIC
 
 router = APIRouter()
 
@@ -39,7 +40,7 @@ async def add_user(new_user: UserRegister, producer: KAFKA_PRODUCER):
 
     # Try to send user data to Kafka
     try:
-        await send_to_kafka(producer, "user-events", user_data)
+        await send_user_to_kafka(producer, KAFKA_USER_TOPIC, user_data)
     except Exception as e:
         print(f"Error while sending data to Kafka: {e}")
         raise HTTPException(status_code=500, detail="Failed to send data to Kafka")
@@ -96,4 +97,12 @@ def login_user(token: Annotated[str, (Depends(login_user))]):
     if not token:
         HTTPException(
             status_code=400, detail="Try again, something occurred while generating token.")
-    return token 
+    return token
+
+
+@router.post("/add-user-address")
+def add_address_to_user(current_user: Annotated[User, (Depends(get_current_user))], response: Annotated[Any, Depends(add_user_address)]):
+    """
+    Add an address to a user.
+    """
+    return response
