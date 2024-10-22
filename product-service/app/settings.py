@@ -16,6 +16,6 @@ USER_TOKEN_EXPIRE_TIME = config("USER_TOKEN_EXPIRE_TIME", cast = int)
 ALGORITHM = config("ALGORITHM", cast = str)
 
 
-TESTING_PRODUCT_ID = config("TESTING_PRODUCT_ID", cast = int)
-TESTING_SIZE_ID = config("TESTING_SIZE_ID", cast = int)
-TESTING_CATEGORY_ID = config("TESTING_CATEGORY_ID", cast = int)
+# TESTING_PRODUCT_ID = config("TESTING_PRODUCT_ID", cast = int)
+# TESTING_SIZE_ID = config("TESTING_SIZE_ID", cast = int)
+# TESTING_CATEGORY_ID = config("TESTING_CATEGORY_ID", cast = int)
