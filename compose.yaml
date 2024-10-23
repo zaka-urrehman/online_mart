@@ -40,6 +40,7 @@ services:
       - database
       - kafka-broker
       - kafka-ui
+      - inventory
     # profiles:
     #   - temporary
   # ------------------------------------------------------------------ #
@@ -72,8 +73,77 @@ services:
       - database
       - kafka-broker
       - kafka-ui
+      - product
     # profiles:
     #   - temporary
+  # ------------------------------------------------------------------ #
+  notification:
+    container_name: notification_service
+    build: 
+      context: ./notification-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./notification-service:/code #sync the local code with code inside container 
+    ports:
+      - 8013:8000 
+    depends_on:
+      - database
+      - kafka-broker
+      - kafka-ui
+      - user 
+      - product 
+      - inventory
+    # profiles:
+    #   - temporary
+  # ------------------------------------------------------------------ #
+  order:
+    container_name: order_service
+    build: 
+      context: ./order-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./order-service:/code #sync the local code with code inside container 
+    ports:
+      - 8014:8000 
+    depends_on:
+      - database
+      - kafka-broker
+      - kafka-ui
+      - user 
+      - product 
+      - inventory
+    # profiles:
+    #   - temporary
+  # ------------------------------------------------------------------ #
+  payment:
+    container_name: payment_service
+    build: 
+      context: ./payment-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./payment-service:/code #sync the local code with code inside container 
+    ports:
+      - 8015:8000 
+    depends_on:
+      - database
+      - kafka-broker
+      - kafka-ui
+      - user 
+      - product 
+      - order
+      - inventory
+    # profiles:
+    #   - temporary
+  # ------------------------------------------------------------------ #
+  stripe-cli:
+    image: stripe/stripe-cli
+    container_name: stripe_cli
+    command: listen --forward-to http://host.docker.internal:8000/payment-service/payment/stripe-webhook --events payment_intent.succeeded,payment_intent.payment_failed
+    environment:
+      - STRIPE_API_KEY=${STRIPE_API_KEY}    
+    depends_on:
+      - payment
+    restart: unless-stopped
   # ------------------------------------------------------------------ #
   database:
     image: postgres:latest  # Use the existing PostgreSQL image for the application database
@@ -238,6 +308,6 @@ services:
 
 
 
-secrets:
+secrets:  
   kong_postgres_password:
     file: ./POSTGRES_PASSWORD
