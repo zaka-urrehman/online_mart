@@ -1,20 +1,28 @@
+import json
+
 from sqlalchemy.orm import Session
+from typing import Any 
 from fastapi import HTTPException, status
 from datetime import datetime
 from sqlalchemy import select
+from aiokafka import AIOKafkaProducer
 
 from app.models.order_models import Order, OrderProducts, OrderCreate, OrderStatusUpdate, Product, User, Size
-from app.db.db_connection import DB_SESSION
+from app.db.db_connection import DB_SESSION, engine
+from app.kafka.producer import KAFKA_PRODUCER
+from app.settings import KAFKA_ORDER_TOPIC
 
 
 # ========================== CREATE ORDER ==========================
 
-def create_order(order_data: OrderCreate, session: DB_SESSION):
+async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: KAFKA_PRODUCER,):
     print("Step 1: Start create_order")
 
     # Step 1: Validate user existence
-    user = session.exec(select(User).where(User.user_id == order_data.user_id)).first()
+    user_row = session.exec(select(User).where(User.user_id == order_data.user_id)).first()
+    user = user_row[0]
     print(f"Step 2: Retrieved user: {user}")
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -93,10 +101,58 @@ def create_order(order_data: OrderCreate, session: DB_SESSION):
     session.commit()
     print("All products added to order and committed to database")
 
+    # Step 6: Send order data to Kafka topic
+    await send_order_to_kafka(producer, KAFKA_ORDER_TOPIC, new_order, user.email)
+
     return {
         "message": "Order created successfully",
         "order_id": new_order.order_id
     }
+
+
+# ========================== SEND MESSAGE TO KAFKA TOPIC (order added to db with payment_status="unpaid") ==========================
+
+
+async def send_order_to_kafka(producer: AIOKafkaProducer, topic: str, order_data: Any, email: str):
+    """
+    Send order data to Kafka topic.
+
+    Args:
+        producer (AIOKafkaProducer): Kafka producer instance.
+        topic (str): Kafka topic name.
+        order_data (dict): Order data.
+    """
+
+    # Add the necessary fields for payment processing
+    message = {
+    "order_id": order_data.order_id,
+    "user_id": order_data.user_id,
+    "user_email": email,
+    "delivery_address": order_data.delivery_address,
+    "total_amount": order_data.total_amount,
+    "discount": order_data.discount,
+    "net_amount": order_data.net_amount,
+    "order_status": order_data.order_status,
+    "payment_status": order_data.payment_status,
+    # "created_at": order_data.created_at,
+    "metadata": {
+        "payment_intent": "create",
+        "email": email  # Required for communication or confirmation
+        }
+    }
+
+    try:
+        # Serialize the message to JSON format
+        message_bytes = json.dumps(message).encode("utf-8")
+        
+        # Send the message to the specified Kafka topic
+        await producer.send_and_wait(topic, message_bytes)
+
+        print(f"Order data sent to Kafka topic '{topic}': {message}")
+    except Exception as e:
+        print(f"Failed to send order data to Kafka: {str(e)}") 
+
+
 
 
 # ========================== GET ORDER BY ID WITH PRODUCTS ==========================
@@ -260,3 +316,24 @@ def delete_order(order_id: int, session: DB_SESSION):
     session.commit()
 
     return {"message": "Order and associated products deleted successfully"}
+
+
+# ========================= UPDATE PAYMENT STATUS FOR AN ORDER ==================
+def update_payment_status(order_id: int, status_update: str):
+    """
+    Updates the payment status for a given order.
+    """
+    with Session(engine) as session:
+
+        order = session.get(Order, order_id)
+
+        if not order:
+          raise HTTPException(status_code=404, detail="Order not found")
+
+     # Update order status and timestamp
+        order.payment_status = status_update
+        order.updated_at = datetime.utcnow()
+
+        session.commit()
+
+    return {"message": "Order status updated successfully"}

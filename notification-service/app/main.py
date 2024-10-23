@@ -20,6 +20,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # On app shutdown, stop the Kafka consumer task
+    print("Stopping Kafka consumer...")
     task.cancel()  # Ensure the task is canceled on shutdown
     try:
         await task
