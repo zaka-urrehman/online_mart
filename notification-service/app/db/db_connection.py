@@ -10,7 +10,7 @@ connection_string = str(DATABASE_URL).replace(
 engine = create_engine(
     connection_string,
     connect_args={},
-    echo=True,
+    # echo=True,
     pool_recycle=3600,
     pool_pre_ping=True, 
     pool_timeout=30,
