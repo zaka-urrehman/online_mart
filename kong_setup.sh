@@ -302,5 +302,57 @@ fi
 
 
 
+# -------------------------------------
+# JWT Plugin
+# ------------------------------------
+
+# Define variables
+CONSUMER_NAME="example_user"
+SECRET_KEY="this is secret key for user"
+
+# Check if the consumer already exists
+consumer_check=$(curl -s -o /dev/null -w "%{http_code}" $KONG_ADMIN_URL/consumers/$CONSUMER_NAME)
+
+if [ "$consumer_check" -ne 200 ]; then
+    echo "Creating consumer: $CONSUMER_NAME"
+    curl -i -X POST $KONG_ADMIN_URL/consumers/ \
+        --data "username=$CONSUMER_NAME"
+else
+    echo "Consumer $CONSUMER_NAME already exists."
+fi
+
+# Check if JWT credentials already exist for the consumer
+jwt_check=$(curl -s $KONG_ADMIN_URL/consumers/$CONSUMER_NAME/jwt)
+
+if echo "$jwt_check" | grep -q "$SECRET_KEY"; then
+    echo "JWT credentials already exist for consumer: $CONSUMER_NAME"
+else
+    echo "Creating JWT credentials for consumer: $CONSUMER_NAME"
+    curl -i -X POST $KONG_ADMIN_URL/consumers/$CONSUMER_NAME/jwt \
+        --data "secret=$SECRET_KEY"
+fi
+
+# Enable JWT plugin for inventory-service
+plugin_check_inventory=$(curl -s $KONG_ADMIN_URL/services/inventory-service/plugins)
+if ! echo "$plugin_check_inventory" | grep -q '"name":"jwt"'; then
+    echo "Enabling JWT plugin for inventory-service"
+    curl -i -X POST $KONG_ADMIN_URL/services/inventory-service/plugins \
+        --data "name=jwt"
+else
+    echo "JWT plugin already enabled for inventory-service"
+fi
+
+# Enable JWT plugin for order-service
+plugin_check_order=$(curl -s $KONG_ADMIN_URL/services/order-service/plugins)
+if ! echo "$plugin_check_order" | grep -q '"name":"jwt"'; then
+    echo "Enabling JWT plugin for order-service"
+    curl -i -X POST $KONG_ADMIN_URL/services/order-service/plugins \
+        --data "name=jwt"
+else
+    echo "JWT plugin already enabled for order-service"
+fi
+
+
+
 
 echo "Kong configuration completed!"
