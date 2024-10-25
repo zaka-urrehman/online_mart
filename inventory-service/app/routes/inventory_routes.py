@@ -10,7 +10,7 @@ router = APIRouter()
 # Route for increasing product quantity
 @router.post("/increase-quantity/{product_id}")
 async def increase_quantity(
-    current_user: Annotated[Any, (Depends(get_current_user))],
+    # current_user: Annotated[Any, (Depends(get_current_user))],
     product_id: int,
     quantity: int,   
     result : Annotated[dict, Depends(increase)],
@@ -20,7 +20,7 @@ async def increase_quantity(
 # Route for decreasing product quantity
 @router.post("/decrease-quantity/{product_id}")
 async def decrease_quantity(
-    current_user: Annotated[Any, (Depends(get_current_user))],
+    # current_user: Annotated[Any, (Depends(get_current_user))],
     product_id: int,
     quantity: int,
     result: dict = Depends(decrease)
@@ -30,7 +30,7 @@ async def decrease_quantity(
 # Route for setting product quantity
 @router.post("/set-quantity/{product_id}")
 async def set_quantity(
-    current_user: Annotated[Any, (Depends(get_current_user))],
+    # current_user: Annotated[Any, (Depends(get_current_user))],
     product_id: int,
     quantity: int,
     result: dict = Depends(set)
