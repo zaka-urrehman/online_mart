@@ -5,7 +5,7 @@ from datetime import datetime
 
 from app.db.db_connection import engine 
 from app.models.email_model import NotificationBase
-from app.settings import GOOGLE_APP_PASSWORD
+from app.settings import GOOGLE_APP_PASSWORD, NOTIFICATION_SENDER_EMAIL
 from app.models.email_model import NotificationBase, Notification, NotificationTypeEnum
 
 # =================================================================================================
@@ -13,7 +13,7 @@ def send_email_notification(notification_data: NotificationBase):
     # SMTP server details
     smtp_server = "smtp.gmail.com"  # Example for Gmail
     smtp_port = 587  # Port for TLS
-    sender_email = "khan.zrs2486@gmail.com"  # Replace with your email
+    sender_email = NOTIFICATION_SENDER_EMAIL  # Replace with your email
     sender_password =  GOOGLE_APP_PASSWORD # Replace with your email password
     receiver_email = notification_data.email
 
