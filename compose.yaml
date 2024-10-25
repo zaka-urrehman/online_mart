@@ -37,10 +37,15 @@ services:
     ports:
       - 8010:8000 
     depends_on:
-      - database
-      - kafka-broker
-      - kafka-ui
-      - inventory
+      kafka-broker: 
+        condition: service_healthy
+      kafka-ui: 
+        condition: service_healthy 
+      schema-registry:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+      
     # profiles:
     #   - temporary
   # ------------------------------------------------------------------ #
@@ -54,9 +59,12 @@ services:
     ports:
       - 8011:8000 
     depends_on:
-      - database
       - kafka-broker
       - kafka-ui
+      - schema-registry
+      - database
+      - user
+
     # profiles:
     #   - temporary
   # ------------------------------------------------------------------ #
@@ -90,8 +98,6 @@ services:
       - database
       - kafka-broker
       - kafka-ui
-      - user 
-      - product 
       - inventory
     # profiles:
     #   - temporary
@@ -155,6 +161,12 @@ services:
       - POSTGRES_DB=online-mart-database
     ports:
       - '5433:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zaka"]
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 5s
     volumes:
       - postgres_db:/var/lib/postgresql/data
     # profiles:
@@ -181,6 +193,11 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "19092"]
+      interval: 10s
+      retries: 5
+      start_period: 20s
     restart: always
   # ------------------------------------------------------------------ #
   kafka-ui:
@@ -193,7 +210,14 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 'broker:19092'
       DYNAMIC_CONFIG_ENABLED: "true"
     depends_on:
-      - kafka-broker
+      kafka-broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "broker", "19092"]
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 5s
 
   # ------------------------------------------------------------------ #
   schema-registry:
@@ -205,7 +229,14 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: "schema-registry"
       SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
     depends_on:
-      - kafka-broker
+      kafka-broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 5s
 
   # ------------------------------------------------------------------ #
   db:  # Dedicated PostgreSQL service for Kong
