@@ -2,12 +2,26 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from fastapi import HTTPException, Depends, status
 from typing import Annotated
-from app.db.db_connection import DB_SESSION
 from fastapi.security import OAuth2PasswordBearer
 
+from app.db.db_connection import DB_SESSION
 from app.settings import USER_SECRET_KEY, ALGORITHM
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login-user")
+
+def decode_jwt_token(token: str):
+    try:
+        # Decode the token using the same secret key and algorithm
+        secret_key = str(USER_SECRET_KEY)       
+        payload = jwt.decode(token, secret_key, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+    
+
 def verify_token(token: str):
     try:
         # Convert the Secret object to a string

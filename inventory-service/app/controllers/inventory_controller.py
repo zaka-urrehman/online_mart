@@ -1,4 +1,5 @@
 from sqlmodel import Session, select
+from datetime import datetime, timezone
 from app.db.db_connection import DB_SESSION
 from app.models.product_models import Product
 
@@ -20,7 +21,9 @@ def modify_product_quantity(product_id: int, quantity: int, type: str, session: 
     elif type == "set":
         product.quantity = quantity
     else:
-        return {"error": "Invalid operation type"}
+        return {"error": "Invalid operation type"}    
+
+    product.updated_at = datetime.now(timezone.utc)
 
     session.add(product)
     session.commit()

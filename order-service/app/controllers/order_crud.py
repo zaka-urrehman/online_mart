@@ -1,8 +1,8 @@
 import json
 
 from sqlalchemy.orm import Session
-from typing import Any 
-from fastapi import HTTPException, status
+from typing import Any, Annotated
+from fastapi import HTTPException, status, Header
 from datetime import datetime
 from sqlalchemy import select
 from aiokafka import AIOKafkaProducer
@@ -11,6 +11,7 @@ from app.models.order_models import Order, OrderProducts, OrderCreate, OrderStat
 from app.db.db_connection import DB_SESSION, engine
 from app.kafka.producer import KAFKA_PRODUCER
 from app.settings import KAFKA_ORDER_TOPIC
+from app.utils.auth import get_user_id_from_token
 
 
 # ========================== CREATE ORDER ==========================
@@ -211,7 +212,9 @@ def get_order_by_id(order_id: int, session: DB_SESSION):
 
 # ========================== GET ALL ORDERS WITH PRODUCTS ==========================
 
-def get_all_orders(user_id: int, session: DB_SESSION):
+def get_all_orders( session: DB_SESSION,  authorization: Annotated[str, Header()]):
+    user_id = get_user_id_from_token(authorization)
+
     """
     Fetch all orders of a user and include their products in the response.
     

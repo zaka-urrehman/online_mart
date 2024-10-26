@@ -1,8 +1,12 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends, Header
+from typing import Annotated
 from sqlmodel import Session, select
-from app.models.order_models import Cart, CartProduct, AddToCart, Product, User, Size, UserAddress, UpdateCart
 from datetime import datetime
+
+from app.models.order_models import Cart, CartProduct, AddToCart, Product, User, Size, UserAddress, UpdateCart
 from app.db.db_connection import DB_SESSION
+from app.utils.auth import  get_user_id_from_token
+
 
 
 # ================================ ADD ITEM TO CART ================================
@@ -16,6 +20,7 @@ def add_item_to_cart(cart_data: AddToCart, session: DB_SESSION):
     Returns:
         str: Confirmation message indicating item added to the cart.
     """
+    
     # Step 1: Validate user_id
     print(f"Step 1: Validating user_id = {cart_data.user_id}")
     user = session.exec(select(User).where(User.user_id == cart_data.user_id)).first()
@@ -89,6 +94,7 @@ def add_item_to_cart(cart_data: AddToCart, session: DB_SESSION):
 
 # ================================ RECALCULATE CART TOTAL AFTER ADDING A PRODUCT AND UPDATE ================================
 def update_cart_totals(cart: Cart, session: Session):
+    
     """
     Updates the total price and subtotal of the cart based on its products.
     Args:
@@ -114,7 +120,7 @@ def update_cart_totals(cart: Cart, session: Session):
 
 # ================================ GET CART ================================
 
-def get_cart_details(user_id: int, session: DB_SESSION):
+def get_cart_details(session: DB_SESSION,  authorization: Annotated[str, Header()]):
     """
     Fetches cart details for a given user, including products, sizes, and other cart information.
     
@@ -125,6 +131,7 @@ def get_cart_details(user_id: int, session: DB_SESSION):
     Returns:
         Dict: Formatted cart details including products, size, and cart info.
     """
+    user_id = get_user_id_from_token(authorization)
     # Step 1: Fetch the cart for the user
     cart = session.exec(select(Cart).where(Cart.user_id == user_id)).first()
     if not cart:

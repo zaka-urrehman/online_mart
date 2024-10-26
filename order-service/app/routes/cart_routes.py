@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends 
+from fastapi import APIRouter, Depends, Header
 from typing import Annotated , Any 
 
 from app.controllers.cart_crud import (add_item_to_cart,
@@ -11,7 +11,9 @@ router = APIRouter()
 
 
 @router.get("/get-cart")
-def get_cart(response: Annotated[list, Depends(get_cart_details)]):
+def get_cart(
+    response: Annotated[list, Depends(get_cart_details)],
+    ):
     return response
 
 

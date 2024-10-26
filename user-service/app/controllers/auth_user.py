@@ -29,10 +29,10 @@ def login_user(user_details: UserAuth, session: DB_SESSION):
 
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], session: DB_SESSION):
-    email = verify_token(token)
+    sub = verify_token(token)
     
     # Query the User model to get the current user
-    statement = select(User).where(User.email == email)
+    statement = select(User).where(User.user_id == sub)
     user = session.exec(statement).first()
 
     if user is None:

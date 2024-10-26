@@ -1,10 +1,10 @@
 from jose import jwt, JWTError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Depends, status
 from passlib.context import CryptContext
 
 from app.models.user_models import User
-from app.settings import USER_SECRET_KEY, ALGORITHM
+from app.settings import USER_SECRET_KEY, ALGORITHM, ISS
 
 # Create a password context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -20,14 +20,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def generate_token(user: User, expire_delta: timedelta):
     # Set the expiration time for the token
-    expire = datetime.utcnow() + expire_delta
+    expire = int((datetime.now(timezone.utc) + expire_delta).timestamp())
     print("expiry: " , expire)
 
     # Payload to encode in the token
     payload = {
-        "sub": user.email,
-        "phone": user.phone,  # 'sub' claim (subject) typically stores the username or user ID
-        "exp": expire
+        "sub": str( user.user_id),
+        # "sub": user.email,  # 'sub' claim (subject) typically stores the username, user ID or email
+        # "phone": user.phone,  
+        "role": user.role,
+        "exp": expire,
+        "iss" : ISS,
     }
 
     secret_key = str(USER_SECRET_KEY)   
@@ -48,14 +51,14 @@ def verify_token(token: str):
 
         # Decode the token
         payload = jwt.decode(token, secret_key, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
+        sub: int = int(payload.get("sub"))
+        if sub is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: no email found",
+                detail="Invalid token: no sub found",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return email
+        return sub
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
