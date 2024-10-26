@@ -5,16 +5,19 @@ This repository contains a complete backend solution for an **Online Mart**, bui
 ## Table of Contents
 - [Overview](#overview)
 - [Architecture](#architecture)
-- [Microservices](#microservices)
+  - [Microservices Overview](#microservices-overview)
 - [Tools and Technologies](#tools-and-technologies)
 - [Setup Instructions](#setup-instructions)
+  - [Initial Setup](#initial-setup)
 - [Running the Project](#running-the-project)
-- [Authentication and Security](#authentication-and-security)
-- [Event Handling](#event-handling)
-- [Payment Integration](#payment-integration)
-- [API Documentation](#api-documentation)
-- [Contributing](#contributing)
-- [License](#license)
+  - [Verify Kong Configuration](#1-verify-kong-configuration)
+  - [Set up JWT Authentication for User-Service](#2-set-up-jwt-authentication-for-user-service)
+  - [Set up Stripe for Payment Service](#3-set-up-stripe-for-payment-service)
+  - [Test the Microservices and APIs](#4-test-the-microservices-and-apis)
+  - [Stopping the Services](#5-stopping-the-services)
+  - [Troubleshooting Tips](#6-troubleshooting-tips)
+
+
 
 ## Overview
 The backend system of the **Online Mart** manages user authentication, product management, order processing, inventory updates, notifications, and payments. Each service operates independently and communicates asynchronously using **Kafka**. The project is built with **Python, FastAPI, SqlModel**, and other modern tools.
