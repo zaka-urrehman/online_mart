@@ -12,17 +12,18 @@ from app.db.db_connection import DB_SESSION, engine
 from app.kafka.producer import KAFKA_PRODUCER
 from app.settings import KAFKA_ORDER_TOPIC
 from app.utils.auth import get_user_id_from_token
+from app.protobuf import order_pb2
 
 
 # ========================== CREATE ORDER ==========================
 
 async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: KAFKA_PRODUCER,):
-    print("Step 1: Start create_order")
+    # print("Step 1: Start create_order")
 
     # Step 1: Validate user existence
     user_row = session.exec(select(User).where(User.user_id == order_data.user_id)).first()
     user = user_row[0]
-    print(f"Step 2: Retrieved user: {user}")
+    # print(f"Step 2: Retrieved user: {user}")
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -31,7 +32,7 @@ async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: K
     total_amount = 0
     for product_item in order_data.products:
         product_row = session.exec(select(Product).where(Product.product_id == product_item.product_id)).first()
-        print(f"Step 3: Retrieved product row: {product_row}")
+        # print(f"Step 3: Retrieved product row: {product_row}")
 
         # Directly extract the Product instance from the tuple
         product = product_row[0]
@@ -39,7 +40,7 @@ async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: K
 
         # Ensure the extracted instance is of Product type
         if not isinstance(product, Product):
-            print("Product is not a Product instance")
+            # print("Product is not a Product instance")
             raise HTTPException(status_code=500, detail="Product data is not in the expected format")
 
         if isinstance(product, Product):
@@ -49,25 +50,25 @@ async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: K
         if price is None:
             raise HTTPException(status_code=404, detail="Product price not found")
 
-        print(f"Step 3a: Product price: {price}")
+        # print(f"Step 3a: Product price: {price}")
 
         # Validate size
         size = session.exec(select(Size).where(Size.size_id == product_item.size_id)).first()
-        print(f"Step 4: Retrieved size: {size}")
+        # print(f"Step 4: Retrieved size: {size}")
         if not size:
             raise HTTPException(status_code=404, detail=f"Size with ID {product_item.size_id} not found")
 
         # Check product price and update total_amount
         if price > 0:
             total_amount += price * product_item.quantity
-            print(f"Step 4a: Total amount updated to {total_amount}")
+            # print(f"Step 4a: Total amount updated to {total_amount}")
         else:
             print(f"Product ID {product.product_id} has a price of 0. Skipping price calculation.")
 
     # Calculate net amount (total - discount)
     discount = order_data.discount if order_data.discount else 0.0
     net_amount = total_amount - discount
-    print(f"Total Amount: {total_amount}, Discount: {discount}, Net Amount: {net_amount}")
+    # print(f"Total Amount: {total_amount}, Discount: {discount}, Net Amount: {net_amount}")
 
     # Step 3: Create the order
     new_order = Order(
@@ -85,7 +86,7 @@ async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: K
     session.add(new_order)
     session.commit()
     session.refresh(new_order)
-    print(f"Order created successfully with order_id: {new_order.order_id}")
+    # print(f"Order created successfully with order_id: {new_order.order_id}")
 
     # Step 4: Insert products into OrderProducts
     for product_item in order_data.products:
@@ -100,7 +101,7 @@ async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: K
 
     # Step 5: Commit final changes to the database
     session.commit()
-    print("All products added to order and committed to database")
+    # print("All products added to order and committed to database")
 
     # Step 6: Send order data to Kafka topic
     await send_order_to_kafka(producer, KAFKA_ORDER_TOPIC, new_order, user.email)
@@ -125,31 +126,51 @@ async def send_order_to_kafka(producer: AIOKafkaProducer, topic: str, order_data
     """
 
     # Add the necessary fields for payment processing
-    message = {
-    "order_id": order_data.order_id,
-    "user_id": order_data.user_id,
-    "user_email": email,
-    "delivery_address": order_data.delivery_address,
-    "total_amount": order_data.total_amount,
-    "discount": order_data.discount,
-    "net_amount": order_data.net_amount,
-    "order_status": order_data.order_status,
-    "payment_status": order_data.payment_status,
-    # "created_at": order_data.created_at,
-    "metadata": {
-        "payment_intent": "create",
-        "email": email  # Required for communication or confirmation
-        }
-    }
+    # message = {
+    # "order_id": order_data.order_id,
+    # "user_id": order_data.user_id,
+    # "user_email": email,
+    # "delivery_address": order_data.delivery_address,
+    # "total_amount": order_data.total_amount,
+    # "discount": order_data.discount,
+    # "net_amount": order_data.net_amount,
+    # "order_status": order_data.order_status,
+    # "payment_status": order_data.payment_status,
+    # # "created_at": order_data.created_at,
+    # "metadata": {
+    #     "payment_intent": "create",
+    #     "email": email  # Required for communication or confirmation
+    #     }
+    # }
+    # Create an Order message instance
+    # Convert order_id and user_id to strings
+    order_message = order_pb2.Order(
+        order_id=str(order_data.order_id),  # Convert to string
+        user_id=str(order_data.user_id),    # Convert to string
+        user_email=email,
+        delivery_address=str(order_data.delivery_address),
+        total_amount=float(order_data.total_amount),
+        discount=float(order_data.discount),
+        net_amount=float(order_data.net_amount),
+        order_status=order_data.order_status,
+        payment_status=order_data.payment_status,
+        metadata=order_pb2.Metadata(
+            payment_intent="create",
+            email=email
+        )
+    )
 
     try:
-        # Serialize the message to JSON format
-        message_bytes = json.dumps(message).encode("utf-8")
+        # # Serialize the message to JSON format
+        # message_bytes = json.dumps(message).encode("utf-8")
+
+         # Serialize the message to Protobuf format
+        message_bytes = order_message.SerializeToString()
         
         # Send the message to the specified Kafka topic
         await producer.send_and_wait(topic, message_bytes)
 
-        print(f"Order data sent to Kafka topic '{topic}': {message}")
+        print(f"Order data sent to Kafka topic '{topic}': {message_bytes}")
     except Exception as e:
         print(f"Failed to send order data to Kafka: {str(e)}") 
 
@@ -326,6 +347,7 @@ def update_payment_status(order_id: int, status_update: str):
     """
     Updates the payment status for a given order.
     """
+   
     with Session(engine) as session:
 
         order = session.get(Order, order_id)

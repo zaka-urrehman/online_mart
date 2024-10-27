@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package order;
+
+message Metadata {
+  string payment_intent = 1;
+  string email = 2;
+}
+
+message Order {
+  string order_id = 1;
+  string user_id = 2;
+  string user_email = 3;
+  string delivery_address = 4;
+  float total_amount = 5;
+  float discount = 6;
+  float net_amount = 7;
+  string order_status = 8;
+  string payment_status = 9;
+  Metadata metadata = 10;
+}

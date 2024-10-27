@@ -7,6 +7,7 @@ from aiokafka import AIOKafkaProducer
 
 from app.settings import STRIPE_API_KEY
 from app.kafka.producer import KAFKA_PRODUCER
+from app.protobuf import payment_status_pb2  
 
 # Configure logger
 logging.basicConfig(level=logging.INFO)
@@ -97,7 +98,7 @@ async def process_stripe_payment(order_id: int, user_id: int, net_amount: float)
 # ============================== SEND PAYMENT STATUS TO KAFKA TOPIC ==============================
 async def send_payment_status_to_kafka(topic: str, order_id: int, user_id: int, payment_status: str, bootstrap_servers: str = 'broker:19092'):
     """
-    Send payment status to Kafka topic.
+    Send payment status to Kafka topic using Protobuf serialization.
 
     Args:
         topic (str): Kafka topic name.
@@ -106,25 +107,26 @@ async def send_payment_status_to_kafka(topic: str, order_id: int, user_id: int, 
         payment_status (str): The status of the payment (e.g., 'paid').
         bootstrap_servers (str): Kafka bootstrap server.
     """
-    # Initialize the Kafka producer
     producer = AIOKafkaProducer(
-        bootstrap_servers=bootstrap_servers,
-        value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        bootstrap_servers=bootstrap_servers
     )
 
     # Start the producer
     await producer.start()
 
     try:
-        # Create the message payload
-        message = {
-            "order_id": order_id,
-            "user_id": user_id,
-            "payment_status": payment_status
-        }
+        # Create a PaymentStatus message instance
+        payment_status_message = payment_status_pb2.PaymentStatus(
+            order_id=str(order_id),     # Convert to string for Protobuf
+            user_id=str(user_id),       # Convert to string for Protobuf
+            payment_status=payment_status
+        )
+
+        # Serialize the message to Protobuf format
+        message_bytes = payment_status_message.SerializeToString()
 
         # Send the message to the specified Kafka topic
-        await producer.send_and_wait(topic, message)
+        await producer.send_and_wait(topic, message_bytes)
 
         print(f"Payment status for Order ID {order_id} sent to Kafka topic '{topic}'")
     except Exception as e:
