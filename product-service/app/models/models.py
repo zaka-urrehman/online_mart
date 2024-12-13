@@ -16,8 +16,8 @@ class ProductBase(SQLModel):
     price: float
     quantity: int
 
-class SizeBase(SQLModel):
-    size_name: str
+# class SizeBase(SQLModel):
+#     size_name: str
 
 # ==================== Category Models ====================
 class AddCategory(CategoryBase):
@@ -59,84 +59,88 @@ class Product(ProductBase, table=True):
 
     # Relationships
     category: Optional["Category"] = Relationship(back_populates="products")
-    sizes: List["ProductSize"] = Relationship(back_populates="product")
+#     sizes: List["ProductSize"] = Relationship(back_populates="product")
+
+#     NOTE: Below code was used when only single db was used for user and products etc.
+#           but now seprate db is being used for products so we don't need user models. 
+#           also the sizes are currently commented for simplicity
 
 
-# ==================== Size Models ====================
-class AddSize(SizeBase):
-    """
-    Model for creating a new size (input).
-    Inherits size_name from SizeBase.
-    """
-    pass
+# # ==================== Size Models ====================
+# class AddSize(SizeBase):
+#     """
+#     Model for creating a new size (input).
+#     Inherits size_name from SizeBase.
+#     """
+#     pass
 
-class Size(SQLModel, table=True):
-    """
-    Full model for Size with all fields for response and database.
-    """
-    size_id: Optional[int] = Field(default=None, primary_key=True)
-    size_name: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+# class Size(SQLModel, table=True):
+#     """
+#     Full model for Size with all fields for response and database.
+#     """
+#     size_id: Optional[int] = Field(default=None, primary_key=True)
+#     size_name: str
+#     created_at: datetime = Field(default_factory=datetime.utcnow)
+#     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # Relationships
-    products: List["ProductSize"] = Relationship(back_populates="size")
-
-
-class SizeResponse(SQLModel):
-    size_id: Optional[int]
-    size_name: str
-    created_at: datetime
-    updated_at: datetime
+#     # Relationships
+#     products: List["ProductSize"] = Relationship(back_populates="size")
 
 
-
-# ==================== ProductSize Model ====================
-class ProductSize(SQLModel, table=True):
-    """
-    Many-to-many relationship model between Product and Size.
-    """
-    product_id: Optional[int] = Field(default=None, foreign_key="product.product_id", primary_key=True)
-    size_id: Optional[int] = Field(default=None, foreign_key="size.size_id", primary_key=True)
-
-    # Relationships
-    product: Optional["Product"] = Relationship(back_populates="sizes")
-    size: Optional["Size"] = Relationship(back_populates="products")
+# class SizeResponse(SQLModel):
+#     size_id: Optional[int]
+#     size_name: str
+#     created_at: datetime
+#     updated_at: datetime
 
 
 
-# ====================== Copy Pasting Models from User Service to verify user from DB ======================
-# Define a regex pattern for validating emails
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+# # ==================== ProductSize Model ====================
+# class ProductSize(SQLModel, table=True):
+#     """
+#     Many-to-many relationship model between Product and Size.
+#     """
+#     product_id: Optional[int] = Field(default=None, foreign_key="product.product_id", primary_key=True)
+#     size_id: Optional[int] = Field(default=None, foreign_key="size.size_id", primary_key=True)
+
+#     # Relationships
+#     product: Optional["Product"] = Relationship(back_populates="sizes")
+#     size: Optional["Size"] = Relationship(back_populates="products")
 
 
 
-# Base class for common properties: email, phone
-class UserBase(SQLModel):
-    email: str
-    phone: str
+# # ====================== Copy Pasting Models from User Service to verify user from DB ======================
+# # Define a regex pattern for validating emails
+# EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
 
-     # Custom validator to ensure the email matches the regex pattern
-    @field_validator('email')
-    def validate_email(cls, value):
-        if not EMAIL_REGEX.match(value):
-            raise ValueError('Invalid email address')
-        return value
 
-# 1. UserAuth Class
-class UserAuth(UserBase):
-    password: str
 
-# 2. UserRegister Class
-class UserRegister(UserAuth):
-    first_name: str
-    last_name: str
+# # Base class for common properties: email, phone
+# class UserBase(SQLModel):
+#     email: str
+#     phone: str
 
-# 4. User Class (Main table class with all fields)
-class User(UserRegister, table=True):
-    user_id: int | None = Field(default=None, primary_key=True)
-    image: str | None = None
-    role: str | None = "user"
-    status: str | None = "active"  # default status is 'active'
-    created_at: datetime | None = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime | None = Field(default_factory=lambda: datetime.now(timezone.utc))
+#      # Custom validator to ensure the email matches the regex pattern
+#     @field_validator('email')
+#     def validate_email(cls, value):
+#         if not EMAIL_REGEX.match(value):
+#             raise ValueError('Invalid email address')
+#         return value
+
+# # 1. UserAuth Class
+# class UserAuth(UserBase):
+#     password: str
+
+# # 2. UserRegister Class
+# class UserRegister(UserAuth):
+#     first_name: str
+#     last_name: str
+
+# # 4. User Class (Main table class with all fields)
+# class User(UserRegister, table=True):
+#     user_id: int | None = Field(default=None, primary_key=True)
+#     image: str | None = None
+#     role: str | None = "user"
+#     status: str | None = "active"  # default status is 'active'
+#     created_at: datetime | None = Field(default_factory=lambda: datetime.now(timezone.utc))
+#     updated_at: datetime | None = Field(default_factory=lambda: datetime.now(timezone.utc))

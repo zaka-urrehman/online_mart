@@ -2,12 +2,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
 from fastapi import HTTPException
+from aiokafka import AIOKafkaProducer
 
 from app.db.db_connection import DB_SESSION
-from app.models.models import Product, AddProduct, ProductSize, Size, Category
-
-from sqlalchemy.orm import joinedload
-
+from app.models.models import Product, AddProduct,  Category
+from app.kafka.producer import KAFKA_PRODUCER
+from app.protobuf.product_added_pb2 import ProductAdded
+from app.settings import KAFKA_ADD_PRODUCT_TOPIC
 # ========================================= GET ALL PRODUCTS =====================================================
 
 def get_all_products(session: DB_SESSION):
@@ -23,24 +24,18 @@ def get_all_products(session: DB_SESSION):
         product_list = []
         # n = 1
         for product in products:
-            # print(f"Step 3 loop{n}: Processing product with ID: {product.product_id}")
+            # # Fetch associated sizes
+            # statement = select(Size).join(ProductSize).where(ProductSize.product_id == product.product_id)
+            # sizes = session.exec(statement).all()
 
-            # Fetch associated sizes
-            statement = select(Size).join(ProductSize).where(ProductSize.product_id == product.product_id)
-            sizes = session.exec(statement).all()
-            # print(f"Step 4 loop{n}: Sizes fetched for product ID {product.product_id}: {sizes}")
+            # # Convert sizes to dictionaries for the response
+            # sizes_list = [size.model_dump() for size in sizes]
 
-            # Convert sizes to dictionaries for the response
-            sizes_list = [size.model_dump() for size in sizes]
-            # print(f"Step 5 loop{n}: Sizes list created for product ID {product.product_id}: {sizes_list}")
-
-            # Convert product to a dictionary for the response
+            # # Convert product to a dictionary for the response
             product_dict = product.model_dump()  # Convert product to dictionary
-            # print(f"Step 6 loop{n}: Product dictionary before adding sizes for product ID {product.product_id}: {product_dict}")
 
             # Add the sizes field to the dictionary (not as part of the SQLAlchemy object)
-            product_dict['sizes'] = sizes_list
-            # print(f"Step 7 loop{n}: Final product dictionary for product ID {product.product_id}: {product_dict}")
+            # product_dict['sizes'] = sizes_list
 
             product_list.append(product_dict)
             # n+=1
@@ -58,18 +53,18 @@ def get_product_by_id(product_id: int, session: DB_SESSION):
     """
     Retrieve a product by its ID along with its associated sizes.
     """
-    statement = select(Product).options(joinedload(Product.sizes).joinedload(ProductSize.size)).where(Product.product_id == product_id)
+    statement = select(Product).where(Product.product_id == product_id)
     product = session.exec(statement).first()
 
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
     # Add sizes to the product
-    sizes = [{"size_id": product_size.size.size_id, "size_name": product_size.size.size_name}
-             for product_size in product.sizes]
+    # sizes = [{"size_id": product_size.size.size_id, "size_name": product_size.size.size_name}
+    #          for product_size in product.sizes]
 
     product_dict = product.dict()  # Convert product to dict to append sizes
-    product_dict["sizes"] = sizes
+    # product_dict["sizes"] = sizes
 
     return product_dict
 
@@ -90,7 +85,7 @@ def validate_category_exists(cat_id: int, session: DB_SESSION):
     return category
 
 # ========================================= CREATE NEW PRODUCT ===================================================
-async def add_product_in_db(new_product: AddProduct, session: DB_SESSION):
+async def add_product_in_db(new_product: AddProduct, session: DB_SESSION, producer: KAFKA_PRODUCER):
     # Validate category ID
     validate_category_exists(new_product.cat_id, session)
     
@@ -108,12 +103,43 @@ async def add_product_in_db(new_product: AddProduct, session: DB_SESSION):
     session.commit()
     session.refresh(product)
 
+    await send_product_to_kafka(producer, KAFKA_ADD_PRODUCT_TOPIC, product)
+
+
     return {
         "product_id": product.product_id,
         "product_name": product.product_name,
     }
 
 
+# ========================================= SEND NEW PRODUCT DETAILS TO KAFKA PRODUCT =======================================================
+async def send_product_to_kafka(producer: AIOKafkaProducer, topic: str, product: Product):
+    """
+    Sends product data to the Kafka topic.
+
+    Args:
+        producer (AIOKafkaProducer): Kafka producer instance.
+        topic (str): Kafka topic name.
+        product (Product): The product instance to send.
+    """
+    # Create the Protobuf message
+    product_message = ProductAdded(
+        product_id=int(product.product_id) if product.product_id is not None else 0,
+        quantity=int(product.quantity) if product.quantity is not None else 0,
+        brand=str(product.brand) if product.brand else "",
+        expiry=product.expiry.isoformat() if product.expiry else "",
+        price=float(product.price) if product.price is not None else 0.0,
+    )
+
+    try:
+        # Serialize the Protobuf message
+        message_bytes = product_message.SerializeToString()
+        
+        # Send the message to Kafka
+        await producer.send_and_wait(topic, message_bytes)
+        print(f"Product data sent to Kafka topic '{topic}': {message_bytes}")
+    except Exception as e:
+        print(f"Failed to send product data to Kafka: {str(e)}")
 # ========================================= UPDATE PRODUCT =======================================================
 
 def update_product_in_db(product_id: int, updated_product: AddProduct, session: DB_SESSION):
@@ -153,29 +179,29 @@ def delete_product_from_db(product_id: int, session: DB_SESSION):
 
 # ========================================= ASSIGN SIZES TO PRODUCT ==============================================
 
-def assign_sizes_to_product(product_id: int, size_ids: list[int], session: DB_SESSION):
-    """
-    Assign new sizes to a product without removing the existing ones.
-    """
-    product = session.exec(select(Product).where(Product.product_id == product_id)).first()
+# def assign_sizes_to_product(product_id: int, size_ids: list[int], session: DB_SESSION):
+#     """
+#     Assign new sizes to a product without removing the existing ones.
+#     """
+#     product = session.exec(select(Product).where(Product.product_id == product_id)).first()
 
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+#     if not product:
+#         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Get current sizes assigned to the product
-    existing_sizes = session.exec(
-        select(ProductSize.size_id).where(ProductSize.product_id == product_id)
-    ).all()
+#     # Get current sizes assigned to the product
+#     existing_sizes = session.exec(
+#         select(ProductSize.size_id).where(ProductSize.product_id == product_id)
+#     ).all()
 
-    existing_size_ids = {size_id for (size_id,) in existing_sizes}
+#     existing_size_ids = {size_id for (size_id,) in existing_sizes}
 
-    # Add only the sizes that are not already assigned
-    for size_id in size_ids:
-        if size_id not in existing_size_ids:
-            product_size = ProductSize(product_id=product_id, size_id=size_id)
-            session.add(product_size)
+#     # Add only the sizes that are not already assigned
+#     for size_id in size_ids:
+#         if size_id not in existing_size_ids:
+#             product_size = ProductSize(product_id=product_id, size_id=size_id)
+#             session.add(product_size)
 
-    session.commit()
+#     session.commit()
 
-    return {"message": "Sizes assigned to product successfully."}
+#     return {"message": "Sizes assigned to product successfully."}
 

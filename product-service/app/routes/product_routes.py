@@ -3,10 +3,10 @@ from fastapi.encoders import jsonable_encoder
 from typing import  Annotated, Any
 
 from app.utils.auth import get_current_user
-from app.models.models import AddProduct, Product, ProductSize
+from app.models.models import AddProduct, Product
 from app.controllers.product_crud import (
     get_all_products, get_product_by_id, add_product_in_db,
-    update_product_in_db, delete_product_from_db, assign_sizes_to_product
+    update_product_in_db, delete_product_from_db
 )
 
 router = APIRouter()
@@ -60,9 +60,9 @@ async def delete_product( current_user: Annotated[Any, (Depends(get_current_user
 
 # ========================================= ASSIGN SIZES TO PRODUCT ==============================================
 
-@router.post("/assign-sizes/{product_id}")
-async def assign_sizes(current_user: Annotated[Any, (Depends(get_current_user))], product_id: int, size_ids: list[int], message: Annotated[dict, Depends(assign_sizes_to_product)]):
-    """
-    Assign sizes to a product.
-    """
-    return message
+# @router.post("/assign-sizes/{product_id}")
+# async def assign_sizes(current_user: Annotated[Any, (Depends(get_current_user))], product_id: int, size_ids: list[int], message: Annotated[dict, Depends(assign_sizes_to_product)]):
+#     """
+#     Assign sizes to a product.
+#     """
+#     return message

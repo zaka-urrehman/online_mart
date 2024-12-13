@@ -15,6 +15,7 @@ ADMIN_TOKEN_EXPIRY_TIME = config("ADMIN_TOKEN_EXPIRY_TIME", cast = int)
 USER_TOKEN_EXPIRE_TIME = config("USER_TOKEN_EXPIRE_TIME", cast = int)
 ALGORITHM = config("ALGORITHM", cast = str)
 
+KAFKA_ADD_PRODUCT_TOPIC = config("KAFKA_ADD_PRODUCT_TOPIC", cast = str)
 
 # TESTING_PRODUCT_ID = config("TESTING_PRODUCT_ID", cast = int)
 # TESTING_SIZE_ID = config("TESTING_SIZE_ID", cast = int)

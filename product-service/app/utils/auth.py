@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 
-from app.models.models import User
+# from app.models.models import User
 from app.db.db_connection import DB_SESSION
 from app.settings import USER_SECRET_KEY, ALGORITHM
 
@@ -44,13 +44,13 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], session: DB_
     sub = verify_token(token)
     
     # Query the User model to get the current user
-    statement = select(User).where(User.user_id == sub)
-    user = session.exec(statement).first()
+    # statement = select(User).where(User.user_id == sub)
+    # user = session.exec(statement).first()
 
-    if user is None:
+    if sub is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="The users whose token is provided doesn't exist in the db",
+            detail="Incorrect Token Provided",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return user
+    return sub

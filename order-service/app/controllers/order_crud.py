@@ -3,11 +3,11 @@ import json
 from sqlalchemy.orm import Session
 from typing import Any, Annotated
 from fastapi import HTTPException, status, Header
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import select
 from aiokafka import AIOKafkaProducer
 
-from app.models.order_models import Order, OrderProducts, OrderCreate, OrderStatusUpdate, Product, User, Size
+from app.models.order_models import Order, OrderProducts, OrderCreate, OrderStatusUpdate
 from app.db.db_connection import DB_SESSION, engine
 from app.kafka.producer import KAFKA_PRODUCER
 from app.settings import KAFKA_ORDER_TOPIC
@@ -17,53 +17,49 @@ from app.protobuf import order_pb2
 
 # ========================== CREATE ORDER ==========================
 
-async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: KAFKA_PRODUCER,):
+async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: KAFKA_PRODUCER, authorization: Annotated[str, Header()]):
     # print("Step 1: Start create_order")
+    user_id = get_user_id_from_token(authorization)   
 
-    # Step 1: Validate user existence
-    user_row = session.exec(select(User).where(User.user_id == order_data.user_id)).first()
-    user = user_row[0]
-    # print(f"Step 2: Retrieved user: {user}")
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    if user_id != order_data.user_id:
+        raise HTTPException(status_code=404, detail="Invalid User ID provided")
 
     # Step 2: Validate products and calculate total amount
     total_amount = 0
     for product_item in order_data.products:
-        product_row = session.exec(select(Product).where(Product.product_id == product_item.product_id)).first()
-        # print(f"Step 3: Retrieved product row: {product_row}")
+        # product_row = session.exec(select(Product).where(Product.product_id == product_item.product_id)).first()
+        # # print(f"Step 3: Retrieved product row: {product_row}")
 
-        # Directly extract the Product instance from the tuple
-        product = product_row[0]
+        # # Directly extract the Product instance from the tuple
+        # product = product_row[0]
         
 
-        # Ensure the extracted instance is of Product type
-        if not isinstance(product, Product):
-            # print("Product is not a Product instance")
-            raise HTTPException(status_code=500, detail="Product data is not in the expected format")
+        # # Ensure the extracted instance is of Product type
+        # if not isinstance(product, Product):
+        #     # print("Product is not a Product instance")
+        #     raise HTTPException(status_code=500, detail="Product data is not in the expected format")
 
-        if isinstance(product, Product):
-            price = product.price            
-        # Extract and check product price
-        # price = product.price
-        if price is None:
-            raise HTTPException(status_code=404, detail="Product price not found")
+        # if isinstance(product, Product):
+        #     price = product.price            
+        # # Extract and check product price
+        # # price = product.price
+        # if price is None:
+        #     raise HTTPException(status_code=404, detail="Product price not found")
 
-        # print(f"Step 3a: Product price: {price}")
+        # # print(f"Step 3a: Product price: {price}")
 
-        # Validate size
-        size = session.exec(select(Size).where(Size.size_id == product_item.size_id)).first()
-        # print(f"Step 4: Retrieved size: {size}")
-        if not size:
-            raise HTTPException(status_code=404, detail=f"Size with ID {product_item.size_id} not found")
+        # # Validate size
+        # size = session.exec(select(Size).where(Size.size_id == product_item.size_id)).first()
+        # # print(f"Step 4: Retrieved size: {size}")
+        # if not size:
+        #     raise HTTPException(status_code=404, detail=f"Size with ID {product_item.size_id} not found")
 
         # Check product price and update total_amount
-        if price > 0:
-            total_amount += price * product_item.quantity
+        if product_item.product_price > 0:
+            total_amount += product_item.product_price * product_item.quantity
             # print(f"Step 4a: Total amount updated to {total_amount}")
         else:
-            print(f"Product ID {product.product_id} has a price of 0. Skipping price calculation.")
+            print(f"Product ID {product_item.product_id} has a price of 0. Skipping price calculation.")
 
     # Calculate net amount (total - discount)
     discount = order_data.discount if order_data.discount else 0.0
@@ -93,8 +89,7 @@ async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: K
         order_product = OrderProducts(
             order_id=new_order.order_id,
             product_id=product_item.product_id,
-            size_id=product_item.size_id,
-            price_at_purchase=product.price,
+            price_at_purchase=product_item.product_price,
             quantity=product_item.quantity
         )
         session.add(order_product)
@@ -104,7 +99,7 @@ async def create_order(order_data: OrderCreate, session: DB_SESSION, producer: K
     # print("All products added to order and committed to database")
 
     # Step 6: Send order data to Kafka topic
-    await send_order_to_kafka(producer, KAFKA_ORDER_TOPIC, new_order, user.email)
+    await send_order_to_kafka(producer, KAFKA_ORDER_TOPIC, new_order, order_data.user_email)
 
     return {
         "message": "Order created successfully",
@@ -192,10 +187,8 @@ def get_order_by_id(order_id: int, session: DB_SESSION):
     """
     # Step 1: Fetch the order with products using a join
     order_data = session.exec(
-        select(Order, OrderProducts, Product, Size)
-        .join(OrderProducts, Order.order_id == OrderProducts.order_id)
-        .join(Product, OrderProducts.product_id == Product.product_id)
-        .join(Size, OrderProducts.size_id == Size.size_id, isouter=True)
+        select(Order, OrderProducts)
+        .join(OrderProducts, Order.order_id == OrderProducts.order_id)       
         .where(Order.order_id == order_id)
     ).all()
 
@@ -207,13 +200,10 @@ def get_order_by_id(order_id: int, session: DB_SESSION):
     products = [
         {
             "product_id": op.product_id,
-            "quantity": op.quantity,
-            "size_id": op.size_id,
-            "size_name": size.size_name if size else None,
+            "quantity": op.quantity,            
             "price_at_purchase": op.price_at_purchase,
-            "product_name": product.product_name
         }
-        for _, op, product, size in order_data
+        for _, op in order_data
     ]
 
     return {
@@ -248,10 +238,8 @@ def get_all_orders( session: DB_SESSION,  authorization: Annotated[str, Header()
     """
     # Step 1: Fetch all orders of a user with products using a join
     order_data = session.exec(
-        select(Order, OrderProducts, Product, Size)
-        .join(OrderProducts, Order.order_id == OrderProducts.order_id)
-        .join(Product, OrderProducts.product_id == Product.product_id)
-        .join(Size, OrderProducts.size_id == Size.size_id, isouter=True)
+        select(Order, OrderProducts)
+        .join(OrderProducts, Order.order_id == OrderProducts.order_id)        
         .where(Order.user_id == user_id)
     ).all()
 
@@ -260,7 +248,7 @@ def get_all_orders( session: DB_SESSION,  authorization: Annotated[str, Header()
 
     # Step 2: Group products by orders
     grouped_orders = {}
-    for order, op, product, size in order_data:
+    for order, op in order_data:
         if order.order_id not in grouped_orders:
             grouped_orders[order.order_id] = {
                 "order_id": order.order_id,
@@ -280,10 +268,7 @@ def get_all_orders( session: DB_SESSION,  authorization: Annotated[str, Header()
         grouped_orders[order.order_id]["products"].append({
             "product_id": op.product_id,
             "quantity": op.quantity,
-            "size_id": op.size_id,
-            "size_name": size.size_name if size else None,
-            "price_at_purchase": op.price_at_purchase,
-            "product_name": product.product_name
+            "price_at_purchase": op.price_at_purchase            
         })
 
     return list(grouped_orders.values())
@@ -301,7 +286,7 @@ def update_order_status(order_id: int, status_update: OrderStatusUpdate, session
 
     # Update order status and timestamp
     order.order_status = status_update.order_status
-    order.updated_at = datetime.utcnow()
+    order.updated_at = datetime.now(timezone.utc)
 
     session.add(order)
     session.commit()
@@ -330,7 +315,7 @@ def delete_order(order_id: int, session: DB_SESSION):
         # Use session.get() to delete each OrderProducts record
         order_product_to_delete = session.get(
             OrderProducts, 
-            (order_product.order_id, order_product.product_id, order_product.size_id)
+            (order_product.order_id, order_product.product_id)
         )
         if order_product_to_delete:
             session.delete(order_product_to_delete)
@@ -357,7 +342,7 @@ def update_payment_status(order_id: int, status_update: str):
 
      # Update order status and timestamp
         order.payment_status = status_update
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
 
         session.commit()
 

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package product_added;
+
+// Message schema for the product-added event
+message ProductAdded {
+  int32 product_id = 1;      // Unique identifier for the product
+  int32 quantity = 2;        // Quantity of the product added
+  string brand = 3;          // Brand of the product
+  string expiry = 4;         // Expiry date of the product in ISO format
+  float price = 5;           // Price of the product
+}

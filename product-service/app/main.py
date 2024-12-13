@@ -19,7 +19,7 @@ app = FastAPI(
 
 
 app.include_router(category_routes.router, prefix="/category", tags=["category"])
-app.include_router(size_routes.router, prefix="/size", tags=["size"])
+# app.include_router(size_routes.router, prefix="/size", tags=["size"])
 app.include_router(product_routes.router, prefix="/product", tags=["product"])
 
 @app.get("/")

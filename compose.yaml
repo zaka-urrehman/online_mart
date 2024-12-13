@@ -13,7 +13,15 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_db:
+  user_postgres_db:
+    driver: local
+  product_postgres_db:
+    driver: local
+  inventory_postgres_db:
+    driver: local
+  notification_postgres_db:
+    driver: local
+  order_postgres_db:
     driver: local
   kong_data: {}
   kong_prefix_vol:
@@ -43,7 +51,7 @@ services:
         condition: service_healthy 
       schema-registry:
         condition: service_healthy
-      database:
+      user-db:
         condition: service_healthy
       
     # profiles:
@@ -62,12 +70,12 @@ services:
       - kafka-broker
       - kafka-ui
       - schema-registry
-      - database
       - user
+      - product-db
 
     # profiles:
     #   - temporary
-  # ------------------------------------------------------------------ #
+  # # ------------------------------------------------------------------ #
   inventory:
     container_name: inventory_service
     build: 
@@ -78,13 +86,13 @@ services:
     ports:
       - 8012:8000 
     depends_on:
-      - database
+      - product
+      - inventory-db
       - kafka-broker
       - kafka-ui
-      - product
     # profiles:
     #   - temporary
-  # ------------------------------------------------------------------ #
+  # # ------------------------------------------------------------------ #
   notification:
     container_name: notification_service
     build: 
@@ -95,13 +103,14 @@ services:
     ports:
       - 8013:8000 
     depends_on:
-      - database
+      - user
+      - notification-db
       - kafka-broker
       - kafka-ui
       - inventory
     # profiles:
     #   - temporary
-  # ------------------------------------------------------------------ #
+  # # ------------------------------------------------------------------ #
   order:
     container_name: order_service
     build: 
@@ -112,7 +121,8 @@ services:
     ports:
       - 8014:8000 
     depends_on:
-      - database
+      - order-db
+      - user-db
       - kafka-broker
       - kafka-ui
       - user 
@@ -131,7 +141,7 @@ services:
     ports:
       - 8015:8000 
     depends_on:
-      - database
+      - user-db
       - kafka-broker
       - kafka-ui
       - user 
@@ -151,24 +161,108 @@ services:
       - payment
     restart: unless-stopped
   # ------------------------------------------------------------------ #
-  database:
+  user-db:
     image: postgres:latest  # Use the existing PostgreSQL image for the application database
     restart: always
-    container_name: PostgresCont
+    container_name: userDB
     environment:
       - POSTGRES_USER=zaka
       - POSTGRES_PASSWORD=zaka123
-      - POSTGRES_DB=online-mart-database
+      - POSTGRES_DB=user-database
     ports:
       - '5433:5432'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zaka"]
+      test: ["CMD-SHELL", "pg_isready -U zaka -d user-database"]
       interval: 10s
       retries: 5
       start_period: 20s
       timeout: 5s
     volumes:
-      - postgres_db:/var/lib/postgresql/data
+      - user_postgres_db:/var/lib/postgresql/data
+    # profiles:
+    #   - temporary
+  # ------------------------------------------------------------------ #
+  product-db:
+    image: postgres:latest  # Use the existing PostgreSQL image for the application database
+    restart: always
+    container_name: productDB
+    environment:
+      - POSTGRES_USER=zaka
+      - POSTGRES_PASSWORD=zaka123
+      - POSTGRES_DB=product-database
+    ports:
+      - '5434:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zaka -d product-database"]
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 5s
+    volumes:
+      - product_postgres_db:/var/lib/postgresql/data
+    # profiles:
+    #   - temporary
+  # ------------------------------------------------------------------ #
+  inventory-db:
+    image: postgres:latest  # Use the existing PostgreSQL image for the application database
+    restart: always
+    container_name: inventoryDB
+    environment:
+      - POSTGRES_USER=zaka
+      - POSTGRES_PASSWORD=zaka123
+      - POSTGRES_DB=inventory-database
+    ports:
+      - '5435:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zaka -d inventory-database"]
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 5s
+    volumes:
+      - inventory_postgres_db:/var/lib/postgresql/data
+    # profiles:
+    #   - temporary
+  # ------------------------------------------------------------------ #
+  notification-db:
+    image: postgres:latest  # Use the existing PostgreSQL image for the application database
+    restart: always
+    container_name: notificationDB
+    environment:
+      - POSTGRES_USER=zaka
+      - POSTGRES_PASSWORD=zaka123
+      - POSTGRES_DB=notification-database
+    ports:
+      - '5436:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zaka -d notification-database"]
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 5s
+    volumes:
+      - notification_postgres_db:/var/lib/postgresql/data
+    # profiles:
+    #   - temporary
+  # ------------------------------------------------------------------ #
+  order-db:
+    image: postgres:latest  # Use the existing PostgreSQL image for the application database
+    restart: always
+    container_name: orderDB
+    environment:
+      - POSTGRES_USER=zaka
+      - POSTGRES_PASSWORD=zaka123
+      - POSTGRES_DB=order-database
+    ports:
+      - '5437:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zaka -d order-database"]
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 5s
+    volumes:
+      - order_postgres_db:/var/lib/postgresql/data
     # profiles:
     #   - temporary
   # ------------------------------------------------------------------ #

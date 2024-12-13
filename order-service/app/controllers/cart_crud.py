@@ -1,9 +1,9 @@
 from fastapi import HTTPException, Depends, Header
 from typing import Annotated
 from sqlmodel import Session, select
-from datetime import datetime
+from datetime import datetime, timezone
 
-from app.models.order_models import Cart, CartProduct, AddToCart, Product, User, Size, UserAddress, UpdateCart
+from app.models.order_models import Cart, CartProduct, AddToCart, UpdateCart
 from app.db.db_connection import DB_SESSION
 from app.utils.auth import  get_user_id_from_token
 
@@ -11,7 +11,7 @@ from app.utils.auth import  get_user_id_from_token
 
 # ================================ ADD ITEM TO CART ================================
 
-def add_item_to_cart(cart_data: AddToCart, session: DB_SESSION):
+def add_item_to_cart(cart_data: AddToCart, session: DB_SESSION, authorization: Annotated[str, Header()]):
     """
     Adds an item to the cart, updating the Cart and CartProduct tables.
     Args:
@@ -21,24 +21,27 @@ def add_item_to_cart(cart_data: AddToCart, session: DB_SESSION):
         str: Confirmation message indicating item added to the cart.
     """
     
-    # Step 1: Validate user_id
-    print(f"Step 1: Validating user_id = {cart_data.user_id}")
-    user = session.exec(select(User).where(User.user_id == cart_data.user_id)).first()
-    if not user:
+    # # Step 1: Validate user_id
+    # print(f"Step 1: Validating user_id = {cart_data.user_id}")
+    # user = session.exec(select(User).where(User.user_id == cart_data.user_id)).first()
+    # if not user:
+    #     raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    # # Step 2: Validate product_id
+    # print(f"Step 2: Validating product_id = {cart_data.product_id}")
+    # product = session.exec(select(Product).where(Product.product_id == cart_data.product_id)).first()
+    # if not product:
+    #     raise HTTPException(status_code=400, detail="Invalid product ID")
+
+    # # Step 3: Validate size_id
+    # print(f"Step 3: Validating size_id = {cart_data.size_id}")
+    # size = session.exec(select(Size).where(Size.size_id == cart_data.size_id)).first()
+    # if not size:
+    #     raise HTTPException(status_code=400, detail="Invalid size ID")
+
+    user_id = get_user_id_from_token(authorization)
+    if user_id != cart_data.user_id:
         raise HTTPException(status_code=400, detail="Invalid user ID")
-
-    # Step 2: Validate product_id
-    print(f"Step 2: Validating product_id = {cart_data.product_id}")
-    product = session.exec(select(Product).where(Product.product_id == cart_data.product_id)).first()
-    if not product:
-        raise HTTPException(status_code=400, detail="Invalid product ID")
-
-    # Step 3: Validate size_id
-    print(f"Step 3: Validating size_id = {cart_data.size_id}")
-    size = session.exec(select(Size).where(Size.size_id == cart_data.size_id)).first()
-    if not size:
-        raise HTTPException(status_code=400, detail="Invalid size ID")
-
     # Step 4: Check if a cart exists for the user
     print(f"Step 4: Checking for existing cart for user_id = {cart_data.user_id}")
     cart = session.exec(
@@ -48,19 +51,18 @@ def add_item_to_cart(cart_data: AddToCart, session: DB_SESSION):
     # Step 5: If no cart exists, create a new one
     if not cart:
         print("Step 5: No existing cart found, creating a new cart")
-        cart = Cart(user_id=cart_data.user_id, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
+        cart = Cart(user_id=cart_data.user_id, created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc))
         session.add(cart)
         session.commit()
         session.refresh(cart)
         print(f"Step 5: New cart created with cart_id = {cart.cart_id}")
 
     # Step 6: Check if the product with the given size already exists in the cart
-    print(f"Step 6: Checking if product {cart_data.product_id} with size {cart_data.size_id} exists in cart {cart.cart_id}")
+    print(f"Step 6: Checking if product {cart_data.product_id}  exists in cart {cart.cart_id}")
     cart_product = session.exec(
         select(CartProduct)
         .where(CartProduct.cart_id == cart.cart_id)
         .where(CartProduct.product_id == cart_data.product_id)
-        .where(CartProduct.size_id == cart_data.size_id)
     ).first()
 
     if cart_product:
@@ -74,9 +76,9 @@ def add_item_to_cart(cart_data: AddToCart, session: DB_SESSION):
         print(f"Step 8: Product not found in cart, creating new CartProduct")
         cart_product = CartProduct(
             cart_id=cart.cart_id,
-            product_id=cart_data.product_id,
-            size_id=cart_data.size_id,
-            quantity=cart_data.quantity
+            product_id=cart_data.product_id,           
+            quantity=cart_data.quantity,
+            product_price=cart_data.product_price
         )
         session.add(cart_product)
         print("Step 8: New CartProduct added to the cart")
@@ -89,7 +91,7 @@ def add_item_to_cart(cart_data: AddToCart, session: DB_SESSION):
     # Step 10: Update the cart's totals (optional)
     update_cart_totals(cart, session)
 
-    return "Item added to cart successfully"
+    return {"message" : "Item added to cart successfully"}
 
 
 # ================================ RECALCULATE CART TOTAL AFTER ADDING A PRODUCT AND UPDATE ================================
@@ -106,13 +108,15 @@ def update_cart_totals(cart: Cart, session: Session):
         select(CartProduct).where(CartProduct.cart_id == cart.cart_id)
     ).all()
 
-    products_total = sum(cp.quantity * session.exec(
-        select(Product.price).where(Product.product_id == cp.product_id)
-    ).first() for cp in cart_products)
+    # products_total = sum(cp.quantity * session.exec(
+    #     select(Product.price).where(Product.product_id == cp.product_id)
+    # ).first() for cp in cart_products)
+
+    products_total = sum(cp.quantity * cp.product_price for cp in cart_products)
 
     cart.products_total = products_total
     cart.sub_total = products_total + cart.delivery_charges - cart.discount
-    cart.updated_at = datetime.utcnow()
+    cart.updated_at = datetime.now(timezone.utc)
 
     session.add(cart)
     session.commit()
@@ -139,31 +143,26 @@ def get_cart_details(session: DB_SESSION,  authorization: Annotated[str, Header(
 
     # Step 2: Fetch all cart products with related product and size details
     cart_products = session.exec(
-        select(CartProduct, Product, Size)
-        .join(Product, CartProduct.product_id == Product.product_id)
-        .outerjoin(Size, CartProduct.size_id == Size.size_id)
+        select(CartProduct)       
         .where(CartProduct.cart_id == cart.cart_id)
     ).all()
 
-    # Step 3: Format the response
-    products_list = []
-    for cart_product, product, size in cart_products:
-        product_info = {
-            "product_id": product.product_id,
-            "product_name": product.product_name,
-            "quantity": cart_product.quantity,
-            "product_size": cart_product.size_id,
-            "size_id": size.size_id if size else None,
-            "size_name": size.size_name if size else None,
-        }
-        products_list.append(product_info)
+    # # Step 3: Format the response
+    # products_list = []
+    # for cart_product in cart_products:
+    #     product_info = {
+    #         "product_id": product.product_id,
+    #         "product_name": product.product_name,
+    #         "quantity": cart_product.quantity,         
+    #     }
+    #     products_list.append(product_info)
 
     # Step 4: Prepare the complete response
     response = {
         "message": "Cart fetched successfully",
         "user_id": cart.user_id,
         "cart_id": cart.cart_id,
-        "products": products_list,
+        "products": cart_products,
         "delivery_address": cart.delivery_address,
         "nearest_branch": cart.nearest_branch,
         "products_total": cart.products_total,
@@ -177,14 +176,17 @@ def get_cart_details(session: DB_SESSION,  authorization: Annotated[str, Header(
 
 
 # ============================== DELETE ITEM FROM CART ================================
-def remove_item_from_cart(cart_id: int, product_id: int, size_id: int, session: DB_SESSION):
+def remove_item_from_cart(cart_id: int, product_id: int, session: DB_SESSION):
     # Step 1: Fetch the CartProduct
     cart_product = session.exec(
         select(CartProduct).where(
             CartProduct.cart_id == cart_id,
-            CartProduct.product_id == product_id,
-            CartProduct.size_id == size_id
+            CartProduct.product_id == product_id,         
         )
+    ).first()
+
+    cart = session.exec(
+        select(Cart).where(Cart.cart_id == cart_id)
     ).first()
 
     # Step 2: If the item doesn't exist, raise an error
@@ -194,6 +196,8 @@ def remove_item_from_cart(cart_id: int, product_id: int, size_id: int, session: 
     # Step 3: Remove the item from the cart
     session.delete(cart_product)
     session.commit()
+    
+    update_cart_totals(cart, session)
 
     return {"message": "Item removed from cart successfully"}
 
@@ -216,12 +220,12 @@ def update_cart(cart_id: int, update_data: UpdateCart, session: DB_SESSION):
         raise HTTPException(status_code=404, detail="Cart not found")
 
     # Step 2: Update fields based on provided data
-    if update_data.delivery_address is not None:
+    # if update_data.delivery_address is not None:
         # Validate if the provided delivery_address exists in UserAddress table
-        address = session.exec(select(UserAddress).where(UserAddress.address_id == update_data.delivery_address)).first()
-        if not address:
-            raise HTTPException(status_code=400, detail="Invalid delivery address ID")
-        cart.delivery_address = update_data.delivery_address
+        # address = session.exec(select(UserAddress).where(UserAddress.address_id == update_data.delivery_address)).first()
+        # if not address:
+        #     raise HTTPException(status_code=400, detail="Invalid delivery address ID")
+    cart.delivery_address = update_data.delivery_address
 
     if update_data.nearest_branch is not None:
         cart.nearest_branch = update_data.nearest_branch
@@ -233,11 +237,11 @@ def update_cart(cart_id: int, update_data: UpdateCart, session: DB_SESSION):
         cart.delivery_charges = update_data.delivery_charges
 
     # Update other fields
-    cart.updated_at = datetime.utcnow()
+    cart.updated_at = datetime.now(timezone.utc)
     cart.sub_total = cart.products_total + cart.delivery_charges - cart.discount
 
     # Step 3: Commit changes to the database
     session.add(cart)
     session.commit()
 
-    return "Cart updated successfully"
+    return {"message" : "Cart updated successfully"}

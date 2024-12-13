@@ -13,7 +13,7 @@ from app.routes import payment_routes
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Creating tables...")
-    create_db_and_tables()
+    # create_db_and_tables()
 
     # Create a Kafka consumer task for the topic
     task = asyncio.create_task(consume_order_events(KAFKA_ORDER_TOPIC, 'broker:19092'))

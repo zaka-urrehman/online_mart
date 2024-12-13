@@ -58,7 +58,9 @@ def verify_token(token: str):
                 detail="Invalid token: no sub found",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        
         return sub
+    
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
